@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>gn-math | CYBER-NEXUS</title>
+    <link rel="icon" type="image/png" href="favicon.png" />
+    <link rel="stylesheet" href="style.css" />
+    <link rel="manifest" href="manifest.json" />
+    <meta name="theme-color" content="#00f2ff" />
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-WX5VS54ZDW"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag() { dataLayer.push(arguments); }
+      gtag('js', new Date());
+      gtag('config', 'G-WX5VS54ZDW');
+    </script>
+  </head>
+  <body>
+    <div class="app-wrapper">
+      <aside class="sidebar">
+        <div class="logo-container">
+          <div class="logo">gn-math</div>
+        </div>
+        
+        <nav class="nav-group">
+          <div class="search-wrapper">
+            <span class="control-label">Search Database</span>
+            <input type="text" id="searchBar" placeholder="Initialize search..." oninput="filterZones()" />
+          </div>
+
+          <div class="filter-wrapper">
+            <span class="control-label">Sort Algorithm</span>
+            <select id="sortOptions" onchange="sortZones()">
+              <option value="name">Alpha-Sort</option>
+              <option value="id">Timestamp</option>
+              <option value="popular">Popularity</option>
+              <option value="trendingDay">Trend (24H)</option>
+              <option value="trendingWeek">Trend (7D)</option>
+              <option value="trendingMonth">Trend (30D)</option>
+            </select>
+          </div>
+
+          <div class="filter-wrapper">
+            <span class="control-label">Filter Protocol</span>
+            <select id="filterOptions" onchange="filterZones2()">
+              <option value="none">All Categories</option>
+            </select>
+          </div>
+
+          <div class="control-label">System Ops</div>
+          <div style="display: flex; gap: 0.5rem;">
+            <button id="refresh" class="terminal-controls" style="border:1px solid var(--border); background:none; color:var(--text); cursor:pointer; padding: 0.5rem; border-radius:4px; flex:1;" onclick="listZones()">Refresh</button>
+            <button id="settings" class="terminal-controls" style="border:1px solid var(--border); background:none; color:var(--text); cursor:pointer; padding: 0.5rem; border-radius:4px; flex:1;">Config</button>
+          </div>
+        </nav>
+      </aside>
+
+      <main class="content-area">
+        <section id="featuredSection">
+          <h2 class="section-title">Priority Streams</h2>
+          <div id="featuredZones" class="zone-container"></div>
+        </section>
+
+        <section id="allSection" style="margin-top: 3rem;">
+          <h2 class="section-title">Global Archives</h2>
+          <div id="container">Loading datastreams...</div>
+        </section>
+
+        <footer>
+          <div class="footer-links">
+            <a href="#" onclick="loadDMCA(); return false;">DMCA_PROTOCOL</a>
+            <a href="#" onclick="showContact(); return false;">COMMS_LINK</a>
+            <a href="#" onclick="loadPrivacy(); return false;">PRIVACY_ENCRYPT</a>
+            <a href="javascript:saveData()">EXPORT_CORE</a>
+            <a href="#" onclick="document.getElementById('importData').click(); return false;">IMPORT_CORE</a>
+            <input type="file" id="importData" style="display: none" onchange="loadData(event)" />
+          </div>
+        </footer>
+      </main>
+    </div>
+
+    <!-- Terminal Viewer Overlay -->
+    <div id="zoneViewer">
+      <div class="terminal-header">
+        <div class="zone-title">
+          <h2 id="zoneName">NODE_ACTIVE</h2>
+          <a id="zoneAuthor" href="#" target="_blank" style="font-size: 0.8rem; color: var(--secondary); text-decoration: none;">[USER_AUTHORIZED]</a>
+        </div>
+        <div class="terminal-controls">
+          <button onclick="fullscreenZone()">FULLSCREEN</button>
+          <button onclick="aboutBlank()">EXTERNAL_LINK</button>
+          <button onclick="downloadZone()">DOWNLOAD_LOCAL</button>
+          <button onclick="closeZone()">DISCONNECT</button>
+        </div>
+      </div>
+      <iframe id="zoneFrame"></iframe>
+      <span id="zoneId" style="display: none"></span>
+    </div>
+
+    <!-- System Popups -->
+    <div id="popupOverlay">
+      <div class="popup" style="background: var(--surface-dark); border: 1px solid var(--primary); color: var(--text);">
+        <div class="popup-header" style="background: var(--surface-dark); border-bottom: 1px solid var(--primary);">
+          <h3 id="popupTitle" style="font-family: var(--font-heading); color: var(--primary);">SYSTEM_MSG</h3>
+          <button id="popupClose" onclick="closePopup()" style="color: var(--primary); background: none; border: none; font-size: 1.5rem; cursor: pointer;">&times;</button>
+        </div>
+        <div id="popupBody" style="font-family: var(--font-body); padding: 1.5rem;"></div>
+      </div>
+    </div>
+
+    <script src="script.js"></script>
+    <script>
+      navigator.serviceWorker.register('/sw.js');
+    </script>
+  </body>
+</html>

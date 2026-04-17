@@ -1,1 +1,1 @@
-my version of gn-math
+# gn-mathh.github.io
