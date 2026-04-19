@@ -5,18 +5,25 @@ const searchBar = document.getElementById('searchBar');
 const sortOptions = document.getElementById('sortOptions');
 const filterOptions = document.getElementById('filterOptions');
 
-// Prioritize GitHub Raw as it's often more reliable than jsDelivr for 403 issues
+// Configuration for delivery sources
+const REPO_OWNER = "Overcastsand";
+const ASSETS_REPO = "assets-gn";
+const COVERS_REPO = "covers-gn";
+const HTML_REPO = "html-gn";
+
+let currentSHA = "main"; // Default to main, will be updated with latest SHA if possible
+
 const zonesurls = [
-    "https://raw.githubusercontent.com/Overcastsand/assets-gn/main/zones.json",
-    "https://cdn.jsdelivr.net/gh/Overcastsand/assets-gn@main/zones.json",
-    "https://cdn.jsdelivr.net/gh/Overcastsand/assets-gn@latest/zones.json",
-    "https://cdn.jsdelivr.net/gh/Overcastsand/assets-gn/zones.json"
+    `https://cdn.jsdelivr.net/gh/${REPO_OWNER}/${ASSETS_REPO}@${currentSHA}/zones.json`,
+    `https://raw.githubusercontent.com/${REPO_OWNER}/${ASSETS_REPO}/${currentSHA}/zones.json`,
+    `https://cdn.jsdelivr.net/gh/${REPO_OWNER}/${ASSETS_REPO}@main/zones.json`,
+    `https://raw.githubusercontent.com/${REPO_OWNER}/${ASSETS_REPO}/main/zones.json`
 ];
 
-const coverURL = "https://cdn.jsdelivr.net/gh/Overcastsand/covers-gn@main";
-const htmlURL = "https://cdn.jsdelivr.net/gh/Overcastsand/html-gn@main";
-const rawCoverURL = "https://raw.githubusercontent.com/Overcastsand/covers-gn/main";
-const rawHTMLURL = "https://raw.githubusercontent.com/Overcastsand/html-gn/main";
+let coverURL = `https://cdn.jsdelivr.net/gh/${REPO_OWNER}/${COVERS_REPO}@${currentSHA}`;
+let htmlURL = `https://cdn.jsdelivr.net/gh/${REPO_OWNER}/${HTML_REPO}@${currentSHA}`;
+let rawCoverURL = `https://raw.githubusercontent.com/${REPO_OWNER}/${COVERS_REPO}/main`;
+let rawHTMLURL = `https://raw.githubusercontent.com/${REPO_OWNER}/${HTML_REPO}/main`;
 
 let zones = [];
 let popularityData = {};
@@ -29,42 +36,87 @@ function toTitleCase(str) {
   );
 }
 
-async function listZones() {
-    // We prioritize raw.githubusercontent.com for reliability
-    const url = "https://raw.githubusercontent.com/Overcastsand/assets-gn/main/zones.json";
-    
+/**
+ * Fetches the latest commit SHA for a repository to ensure we get the freshest content from jsDelivr
+ */
+async function fetchLatestSHA(owner, repo) {
     try {
-        console.log("Fetching zones from:", url);
-        const response = await fetch(url + "?t=" + Date.now());
-        
-        if (!response.ok) {
-            throw new Error(`Failed to fetch zones: ${response.status}`);
+        const response = await fetch(`https://api.github.com/repos/${owner}/${repo}/commits?per_page=1&t=${Date.now()}`);
+        if (response.ok) {
+            const commits = await response.json();
+            if (commits && commits.length > 0) {
+                return commits[0].sha;
+            }
         }
-
-        const json = await response.json();
-        zones = json;
-        if (zones.length > 0) {
-            zones[0].featured = true;
-        }
-
-        // Fetch popularity, but don't let it block the main site loading
-        Promise.all([
-            fetchPopularity("year").catch(e => console.warn("Stats year failed")),
-            fetchPopularity("month").catch(e => console.warn("Stats month failed")),
-            fetchPopularity("week").catch(e => console.warn("Stats week failed")),
-            fetchPopularity("day").catch(e => console.warn("Stats day failed"))
-        ]).then(() => {
-            sortZones();
-        });
-
-        // Handle initial view
-        handleInitialView();
-        populateFilters(json);
-        return; // Exit on success
-    } catch (error) {
-        console.error("Critical error in listZones:", error);
-        container.innerHTML = `Error loading zones: ${error.message}`;
+    } catch (e) {
+        console.warn(`Failed to fetch latest SHA for ${owner}/${repo}, falling back to 'main'`);
     }
+    return "main";
+}
+
+async function listZones() {
+    container.innerHTML = "INITIALIZING ARCHIVES...";
+    
+    // Update SHA for all delivery repos
+    currentSHA = await fetchLatestSHA(REPO_OWNER, ASSETS_REPO);
+    
+    // Update URLs with the latest SHA
+    const activeURLs = [
+        `https://cdn.jsdelivr.net/gh/${REPO_OWNER}/${ASSETS_REPO}@${currentSHA}/zones.json`,
+        `https://raw.githubusercontent.com/${REPO_OWNER}/${ASSETS_REPO}/${currentSHA}/zones.json`,
+        `https://cdn.jsdelivr.net/gh/${REPO_OWNER}/${ASSETS_REPO}@main/zones.json`,
+        `https://raw.githubusercontent.com/${REPO_OWNER}/${ASSETS_REPO}/main/zones.json`
+    ];
+    
+    coverURL = `https://cdn.jsdelivr.net/gh/${REPO_OWNER}/${COVERS_REPO}@${currentSHA}`;
+    htmlURL = `https://cdn.jsdelivr.net/gh/${REPO_OWNER}/${HTML_REPO}@${currentSHA}`;
+
+    let success = false;
+    let lastError = null;
+
+    for (const url of activeURLs) {
+        try {
+            console.log("Attempting to fetch zones from:", url);
+            const response = await fetch(url + "?t=" + Date.now());
+            
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+
+            const json = await response.json();
+            zones = json;
+            
+            // Mark the first one as featured if none are marked
+            if (zones.length > 0 && !zones.some(z => z.featured)) {
+                zones[0].featured = true;
+            }
+
+            success = true;
+            console.log("Successfully loaded zones from:", url);
+            break;
+        } catch (error) {
+            console.warn(`Failed to fetch from ${url}:`, error.message);
+            lastError = error;
+        }
+    }
+
+    if (!success) {
+        container.innerHTML = `CRITICAL_ERROR: Failed to load zones from all sources. <br> ${lastError ? lastError.message : "Unknown error"}`;
+        return;
+    }
+
+    // Fetch popularity, but don't let it block the main site loading
+    Promise.all([
+        fetchPopularity("year").catch(e => console.warn("Stats year failed")),
+        fetchPopularity("month").catch(e => console.warn("Stats month failed")),
+        fetchPopularity("week").catch(e => console.warn("Stats week failed")),
+        fetchPopularity("day").catch(e => console.warn("Stats day failed"))
+    ]).then(() => {
+        sortZones();
+    });
+
+    handleInitialView();
+    populateFilters(zones);
 }
 
 function handleInitialView() {
@@ -110,7 +162,12 @@ function populateFilters(json) {
 function loadEmbeddedZone(zone) {
     const url = zone.url.replace("{COVER_URL}", coverURL).replace("{HTML_URL}", htmlURL);
     fetch(url+"?t="+Date.now()).then(response => response.text()).then(html => {
-        document.documentElement.innerHTML = html;
+        // Inject base tag for relative resources
+        const baseUrl = url.substring(0, url.lastIndexOf('/') + 1);
+        const baseTag = `<base href="${baseUrl}">`;
+        
+        document.documentElement.innerHTML = baseTag + html;
+        
         const popup = document.createElement("div");
         popup.style.position = "fixed";
         popup.style.bottom = "20px";
@@ -122,7 +179,7 @@ function loadEmbeddedZone(zone) {
         popup.style.borderRadius = "5px";
         popup.style.boxShadow = "0px 0px 10px rgba(0,0,0,0.1)";
         popup.style.fontFamily = "Arial, sans-serif";
-        popup.innerHTML = `Play more games at <a href="https://Overcastsand.dev" target="_blank" style="color:#004085; font-weight:bold;">https://Overcastsand.dev</a>!`;
+        popup.innerHTML = `Play more games at <a href="https://gn-math.dev" target="_blank" style="color:#004085; font-weight:bold;">https://gn-math.dev</a>!`;
         const closeBtn = document.createElement("button");
         closeBtn.innerText = "×";
         closeBtn.style.marginLeft = "10px";
@@ -132,6 +189,7 @@ function loadEmbeddedZone(zone) {
         closeBtn.onclick = () => popup.remove();
         popup.appendChild(closeBtn);
         document.body.appendChild(popup);
+        
         document.documentElement.querySelectorAll('script').forEach(oldScript => {
             const newScript = document.createElement('script');
             if (oldScript.src) newScript.src = oldScript.src;
@@ -147,7 +205,7 @@ async function fetchPopularity(duration) {
             popularityData[duration] = {};
         }
         const response = await fetch(
-            "https://data.jsdelivr.net/v1/stats/packages/gh/Overcastsand/html@main/files?period=" + duration
+            `https://data.jsdelivr.net/v1/stats/packages/gh/${REPO_OWNER}/${HTML_REPO}@${currentSHA}/files?period=` + duration
         );
         const data = await response.json();
         data.forEach(file => {
@@ -294,8 +352,6 @@ function filterZones() {
     displayZones(filteredZones);
 }
 
-// The rawHTMLURL constant is already declared at the top of the file, remove the duplicate declaration here.
-
 function openZone(file) {
     if (file.url.startsWith("http")) {
         window.open(file.url, "_blank");
@@ -319,8 +375,13 @@ function openZone(file) {
                         zoneFrame.id = "zoneFrame";
                         zoneViewer.appendChild(zoneFrame);
                     }
+                    
+                    // Critical for delivery: Inject base tag to resolve relative paths in the game HTML
+                    const baseUrl = url.substring(0, url.lastIndexOf('/') + 1);
+                    const baseTag = `<base href="${baseUrl}">`;
+                    
                     zoneFrame.contentDocument.open();
-                    zoneFrame.contentDocument.write(html);
+                    zoneFrame.contentDocument.write(baseTag + html);
                     zoneFrame.contentDocument.close();
                     
                     document.getElementById('zoneName').textContent = file.name;
@@ -357,8 +418,10 @@ function aboutBlank() {
     let zoneUrl = zones.find(z => z.id + '' === document.getElementById('zoneId').textContent).url.replace("{COVER_URL}", coverURL).replace("{HTML_URL}", htmlURL);
     fetch(zoneUrl+"?t="+Date.now()).then(response => response.text()).then(html => {
         if (newWindow) {
+            const baseUrl = zoneUrl.substring(0, zoneUrl.lastIndexOf('/') + 1);
+            const baseTag = `<base href="${baseUrl}">`;
             newWindow.document.open();
-            newWindow.document.write(html);
+            newWindow.document.write(baseTag + html);
             newWindow.document.close();
         }
     })
