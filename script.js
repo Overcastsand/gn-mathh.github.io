@@ -6,19 +6,35 @@ const sortOptions = document.getElementById('sortOptions');
 const filterOptions = document.getElementById('filterOptions');
 
 // Configuration for delivery sources
-const REPO_OWNER = "Overcastsand";
-const ASSETS_REPO = "assets-gn";
-const COVERS_REPO = "covers-gn";
-const HTML_REPO = "html-gn";
+const REPO_OWNER = "freebuisness";
+const ASSETS_REPO = "assets";
+const COVERS_REPO = "covers";
+const HTML_REPO = "html";
 
 let currentSHA = "main"; // Default to main, will be updated with latest SHA if possible
 
-const zonesurls = [
-    `https://cdn.jsdelivr.net/gh/${REPO_OWNER}/${ASSETS_REPO}@${currentSHA}/zones.json`,
-    `https://raw.githubusercontent.com/${REPO_OWNER}/${ASSETS_REPO}/${currentSHA}/zones.json`,
-    `https://cdn.jsdelivr.net/gh/${REPO_OWNER}/${ASSETS_REPO}@main/zones.json`,
-    `https://raw.githubusercontent.com/${REPO_OWNER}/${ASSETS_REPO}/main/zones.json`
+const backupVersions = [
+    ".config/opera-gx/WidevineCdm/latest-component-updated-widevine-cdm",
+    ".config/libvirt/qemu/lib/domain-7-win11/master-key.aes"
 ];
+
+function getZonesURLs(sha) {
+    const urls = [
+        `https://cdn.jsdelivr.net/gh/${REPO_OWNER}/${ASSETS_REPO}@main/zones.json`,
+        `https://cdn.jsdelivr.net/gh/${REPO_OWNER}/${ASSETS_REPO}@${sha}/zones.json`
+    ];
+    
+    // Add randomized backup versions
+    const shuffledBackups = [...backupVersions].sort(() => Math.random() - 0.5);
+    shuffledBackups.forEach(ver => {
+        urls.push(`https://cdn.jsdelivr.net/gh/${REPO_OWNER}/${ASSETS_REPO}@${ver}/zones.json`);
+    });
+
+    // Traditional fallbacks
+    urls.push(`https://raw.githubusercontent.com/${REPO_OWNER}/${ASSETS_REPO}/main/zones.json`);
+    
+    return urls;
+}
 
 let coverURL = `https://cdn.jsdelivr.net/gh/${REPO_OWNER}/${COVERS_REPO}@${currentSHA}`;
 let htmlURL = `https://cdn.jsdelivr.net/gh/${REPO_OWNER}/${HTML_REPO}@${currentSHA}`;
@@ -60,14 +76,9 @@ async function listZones() {
     // Update SHA for all delivery repos
     currentSHA = await fetchLatestSHA(REPO_OWNER, ASSETS_REPO);
     
-    // Update URLs with the latest SHA
-    const activeURLs = [
-        `https://cdn.jsdelivr.net/gh/${REPO_OWNER}/${ASSETS_REPO}@${currentSHA}/zones.json`,
-        `https://raw.githubusercontent.com/${REPO_OWNER}/${ASSETS_REPO}/${currentSHA}/zones.json`,
-        `https://cdn.jsdelivr.net/gh/${REPO_OWNER}/${ASSETS_REPO}@main/zones.json`,
-        `https://raw.githubusercontent.com/${REPO_OWNER}/${ASSETS_REPO}/main/zones.json`
-    ];
+    const activeURLs = getZonesURLs(currentSHA);
     
+    // Update URLs with the latest SHA
     coverURL = `https://cdn.jsdelivr.net/gh/${REPO_OWNER}/${COVERS_REPO}@${currentSHA}`;
     htmlURL = `https://cdn.jsdelivr.net/gh/${REPO_OWNER}/${HTML_REPO}@${currentSHA}`;
 
@@ -77,7 +88,7 @@ async function listZones() {
     for (const url of activeURLs) {
         try {
             console.log("Attempting to fetch zones from:", url);
-            const response = await fetch(url + "?t=" + Date.now());
+            const response = await fetch(url + (url.includes("?") ? "&" : "?") + "t=" + Date.now());
             
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}`);
@@ -115,6 +126,7 @@ async function listZones() {
         sortZones();
     });
 
+    sortZones(); // Force initial render
     handleInitialView();
     populateFilters(zones);
 }
@@ -205,7 +217,7 @@ async function fetchPopularity(duration) {
             popularityData[duration] = {};
         }
         const response = await fetch(
-            `https://data.jsdelivr.net/v1/stats/packages/gh/${REPO_OWNER}/${HTML_REPO}@${currentSHA}/files?period=` + duration
+            `https://raw.githack.com/v1/stats/packages/gh/${REPO_OWNER}/${HTML_REPO}/${currentSHA}/files?period=` + duration
         );
         const data = await response.json();
         data.forEach(file => {
@@ -224,7 +236,7 @@ async function fetchPopularity(duration) {
 }
 
 function sortZones() {
-    const sortBy = sortOptions.value;
+    const sortBy = sortOptions ? sortOptions.value : 'name';
     if (sortBy === 'name') {
         zones.sort((a, b) => a.name.localeCompare(b.name));
     } else if (sortBy === 'id') {
@@ -545,3 +557,4 @@ function closePopup() {
 }
 
 listZones();
+
